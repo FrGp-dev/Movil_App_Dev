@@ -42,7 +42,7 @@ fun TriquiApp() {
 
     var empiezaJugador by remember { mutableStateOf(true) }
 
-    // 🔹 Nuevo estado para controlar si Android debe jugar
+    // Turno de android
     var turnoAndroid by remember { mutableStateOf(false) }
 
     fun reiniciarJuego() {
@@ -61,7 +61,7 @@ fun TriquiApp() {
 
     LaunchedEffect(turnoAndroid) {
         if (turnoAndroid && !juegoTerminado) {
-            delay(800) // espera 0.8s
+            delay(800) // esperar pa poner la jugada
             val jugada = juego.jugadaComputador()
             juego.ponerJugada(TriquiJuego.COMPUTADOR, jugada)
             tablero = juego.tablero
@@ -84,7 +84,7 @@ fun TriquiApp() {
                     juegoTerminado = true
                 }
             }
-            turnoAndroid = false // 🔹 resetea la bandera
+            turnoAndroid = false // mira de quien es el turno
         }
     }
 
@@ -162,7 +162,7 @@ fun TriquiApp() {
 
         Spacer(Modifier.height(16.dp))
 
-        // Botón de Nuevo Juego
+        // Boton de iniciar el jeugo
         Button(onClick = { reiniciarJuego() }) {
             Text("Nuevo Juego")
         }
