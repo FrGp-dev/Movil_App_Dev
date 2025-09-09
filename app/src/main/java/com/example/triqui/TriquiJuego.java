@@ -44,29 +44,24 @@ public class TriquiJuego {
     }
 
     public int verificarGanador() {
-        // 0 = nadie, 1 = empate, 2 = gana jugador, 3 = gana compu
 
-        // Filas
         for (int i = 0; i <= 6; i += 3) {
             if (tablero[i] == tablero[i+1] && tablero[i+1] == tablero[i+2] && tablero[i] != VACIO) {
                 return (tablero[i] == JUGADOR) ? 2 : 3;
             }
         }
 
-        // Columnas
         for (int i = 0; i < 3; i++) {
             if (tablero[i] == tablero[i+3] && tablero[i+3] == tablero[i+6] && tablero[i] != VACIO) {
                 return (tablero[i] == JUGADOR) ? 2 : 3;
             }
         }
 
-        // Diagonales
         if ((tablero[0] == tablero[4] && tablero[4] == tablero[8] && tablero[0] != VACIO) ||
                 (tablero[2] == tablero[4] && tablero[4] == tablero[6] && tablero[2] != VACIO)) {
             return (tablero[4] == JUGADOR) ? 2 : 3;
         }
 
-        // ¿Empate?
         for (char c : tablero) {
             if (c == VACIO) return 0;
         }
