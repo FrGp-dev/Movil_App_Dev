@@ -35,7 +35,33 @@ public class TriquiJuego {
         return false;
     }
 
-    public int jugadaComputador() {
+    /**
+     * Jugada del computador según la dificultad seleccionada
+     */
+    public int jugadaComputador(String dificultad) {
+        if ("Fácil".equalsIgnoreCase(dificultad)) {
+            return jugadaAleatoria();
+        } else if ("Medio".equalsIgnoreCase(dificultad)) {
+            // Primero intenta ganar, si no, aleatorio
+            int winMove = buscarJugadaGanadora(COMPUTADOR);
+            if (winMove != -1) return winMove;
+            return jugadaAleatoria();
+        } else if ("Difícil".equalsIgnoreCase(dificultad)) {
+            // Primero intenta ganar, luego bloquear al jugador, si no, aleatorio
+            int winMove = buscarJugadaGanadora(COMPUTADOR);
+            if (winMove != -1) return winMove;
+
+            int blockMove = buscarJugadaGanadora(JUGADOR);
+            if (blockMove != -1) return blockMove;
+
+            return jugadaAleatoria();
+        }
+        return jugadaAleatoria();
+    }
+
+    // --- Métodos auxiliares ---
+
+    private int jugadaAleatoria() {
         int movimiento;
         do {
             movimiento = aleatorio.nextInt(TABLERO_TAM);
@@ -43,19 +69,40 @@ public class TriquiJuego {
         return movimiento;
     }
 
-    public int verificarGanador() {
-        // 0 = nadie, 1 = empate, 2 = gana jugador, 3 = gana compu
+    /**
+     * Busca si el jugador puede ganar en la siguiente jugada.
+     * Si encuentra una casilla ganadora, devuelve su índice; si no, -1.
+     */
+    private int buscarJugadaGanadora(char jugador) {
+        for (int i = 0; i < TABLERO_TAM; i++) {
+            if (tablero[i] == VACIO) {
+                tablero[i] = jugador;
+                int ganador = verificarGanador();
+                tablero[i] = VACIO;
+                if ((jugador == JUGADOR && ganador == 2) ||
+                        (jugador == COMPUTADOR && ganador == 3)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
 
+    /**
+     * Verifica el estado del juego
+     * @return 0 = nadie, 1 = empate, 2 = gana jugador, 3 = gana compu
+     */
+    public int verificarGanador() {
         // Filas
         for (int i = 0; i <= 6; i += 3) {
-            if (tablero[i] == tablero[i+1] && tablero[i+1] == tablero[i+2] && tablero[i] != VACIO) {
+            if (tablero[i] == tablero[i + 1] && tablero[i + 1] == tablero[i + 2] && tablero[i] != VACIO) {
                 return (tablero[i] == JUGADOR) ? 2 : 3;
             }
         }
 
         // Columnas
         for (int i = 0; i < 3; i++) {
-            if (tablero[i] == tablero[i+3] && tablero[i+3] == tablero[i+6] && tablero[i] != VACIO) {
+            if (tablero[i] == tablero[i + 3] && tablero[i + 3] == tablero[i + 6] && tablero[i] != VACIO) {
                 return (tablero[i] == JUGADOR) ? 2 : 3;
             }
         }
