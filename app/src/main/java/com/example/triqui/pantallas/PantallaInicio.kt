@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.activity.compose.LocalActivity
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +49,7 @@ fun PantallaInicio(navController: NavHostController) {
                     fontSize = 34.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
+                    lineHeight = 40.sp,
                     modifier = Modifier.padding(bottom = 24.dp)
                 )
             }
@@ -77,7 +79,7 @@ fun PantallaInicio(navController: NavHostController) {
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.padding(6.dp)
                         ) {
-                            Text("Android")
+                            Text("Android",color = Color.Red)
                         }
                     }
 
@@ -150,12 +152,12 @@ fun PantallaInicio(navController: NavHostController) {
                                         activity?.finish()
                                     }
                                 ) {
-                                    Text("Sí", color = Color(0xFFB71C1C), fontWeight = FontWeight.Bold)
+                                    Text("Sí", color = Color(0xFFEE0A0A), fontWeight = FontWeight.Bold)
                                 }
                             },
                             dismissButton = {
                                 TextButton(onClick = { mostrar_alerta = false }) {
-                                    Text("Cancelar", color = Color.DarkGray)
+                                    Text("Cancelar", color = Color.Green)
                                 }
                             }
                         )
@@ -163,13 +165,14 @@ fun PantallaInicio(navController: NavHostController) {
                 }
             }
         }
-        Button(onClick = { mostrar_creditos=true},
+        TextButton(onClick = { mostrar_creditos=true},
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .padding(16.dp)
+                .navigationBarsPadding()
         ) {
-            Text("Creditos")
+            Text("Creditos",color = MaterialTheme.colorScheme.onSurface)
         }
         if (mostrar_creditos) {
             AlertDialog(

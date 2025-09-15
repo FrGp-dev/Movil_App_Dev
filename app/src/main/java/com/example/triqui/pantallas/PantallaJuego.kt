@@ -1,5 +1,6 @@
 package com.example.triqui.pantallas
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -58,10 +59,10 @@ fun PantallaJuego(navController: NavHostController) {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp).background(MaterialTheme.colorScheme.background),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("TRIQUI", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+        Text("TRIQUI", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(12.dp))
 
         // Tablero
@@ -83,7 +84,10 @@ fun PantallaJuego(navController: NavHostController) {
                         },
                         enabled = !juegoTerminado && tablero[indice] == TriquiJuego.VACIO,
                         modifier = Modifier.size(100.dp).padding(4.dp),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            contentColor = MaterialTheme.colorScheme.onSurface)
                     ) {
                         Text(
                             text = if (tablero[indice] == TriquiJuego.VACIO) "" else tablero[indice].toString(),
@@ -100,13 +104,13 @@ fun PantallaJuego(navController: NavHostController) {
         }
 
         Spacer(Modifier.height(12.dp))
-        Text(textoEstado, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Text(textoEstado, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,color = MaterialTheme.colorScheme.onSurface)
 
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Text("Jugador: $victoriasJugador")
-            Text("Android: $victoriasComputador")
-            Text("Empates: $empates")
+            Text("Jugador: $victoriasJugador",color = MaterialTheme.colorScheme.onSurface)
+            Text("Android: $victoriasComputador",color = MaterialTheme.colorScheme.onSurface)
+            Text("Empates: $empates",color = MaterialTheme.colorScheme.onSurface)
         }
 
         Spacer(Modifier.height(12.dp))
