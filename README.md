@@ -15,6 +15,9 @@ En este proyecto, dentro de las diferentes ramas del repositorio, se encontrará
 - 🍔 **Reto 4 Menús y Créditos**  
   En este reto se implementan **menús de navegación** y una **pantalla de créditos** en la aplicación, junto con un **logo personalizado** que identifica al proyecto.  
 
+- 🎨 **Reto 5 Gráficos y Sonidos**  
+  En este reto se agregan **gráficos personalizados**, se **dibuja el tablero** en la interfaz y se implementan **sonidos** que se reproducen cada vez que el jugador o el Android realizan una jugada, enriqueciendo la experiencia interactiva.  
+
 ---
 
 ## 👨‍💻 **Autor**
