@@ -178,7 +178,7 @@ fun PantallaJuego(navController: NavHostController) {
         }
 
         Spacer(Modifier.height(12.dp))
-        Text(textoEstado, style = MaterialTheme.typography.titleMedium)
+        Text(textoEstado, style = MaterialTheme.typography.titleMedium,color = MaterialTheme.colorScheme.onSurface)
 
         Spacer(Modifier.height(12.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
