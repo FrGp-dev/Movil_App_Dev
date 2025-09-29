@@ -1,5 +1,6 @@
 package com.example.triqui.pantallas
 
+import android.content.Context
 import android.media.MediaPlayer
 import android.util.Log
 import androidx.compose.foundation.Canvas
@@ -9,6 +10,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -29,54 +31,142 @@ fun PantallaJuego(navController: NavHostController) {
     val context = LocalContext.current
     val density = LocalDensity.current
 
-    // Recuperamos parámetros enviados desde la pantalla anterior
+    // Inicialización de SharedPreferences
+    val sharedPrefs = context.getSharedPreferences("TriquiPrefs", Context.MODE_PRIVATE)
+
+    // Constantes para las claves de SharedPreferences
+    val KEY_TABLERO = "tablero"
+    val KEY_VICTORIAS_JUGADOR = "victoriasJugador"
+    val KEY_VICTORIAS_COMPUTADOR = "victoriasComputador"
+    val KEY_EMPATES = "empates"
+    val KEY_JUEGO_TERMINADO = "juegoTerminado"
+    val KEY_TEXTO_ESTADO = "textoEstado"
+    val KEY_TURNO_ANDROID = "turnoAndroid"
+
+    // Parámetros pasados desde el menú (solo usados si es un juego NUEVO)
     val savedStateHandle = navController.previousBackStackEntry?.savedStateHandle
     val empiezaJugador = savedStateHandle?.get<Boolean>("empiezaJugador") ?: true
     val dificultad = savedStateHandle?.get<String>("dificultad") ?: "Fácil"
 
-    // Estados principales del juego
+    // --- ESTADOS PRINCIPALES: Inicializados para la rotación (rememberSaveable) ---
     var juego by remember { mutableStateOf(TriquiJuego()) }
-    var tablero by remember { mutableStateOf(juego.getTablero()) }
-    var textoEstado by remember { mutableStateOf(if (empiezaJugador) "Tu turno" else "Turno de Android") }
-    var juegoTerminado by remember { mutableStateOf(false) }
+    // Inicializamos con un tablero vacío; se llenará al cargar o al iniciar un nuevo juego.
+    var tablero by rememberSaveable { mutableStateOf(MutableList(9) { 0 }) }
+    var textoEstado by rememberSaveable { mutableStateOf("") }
+    var juegoTerminado by rememberSaveable { mutableStateOf(false) }
 
-    var victoriasJugador by remember { mutableStateOf(0) }
-    var victoriasComputador by remember { mutableStateOf(0) }
-    var empates by remember { mutableStateOf(0) }
+    var victoriasJugador by rememberSaveable { mutableStateOf(0) }
+    var victoriasComputador by rememberSaveable { mutableStateOf(0) }
+    var empates by rememberSaveable { mutableStateOf(0) }
 
-    var turnoAndroid by remember { mutableStateOf(!empiezaJugador) }
+    var turnoAndroid by rememberSaveable { mutableStateOf(!empiezaJugador) }
 
-    // Sonidos precargados para evitar lag al reproducir
+    // Bandera para asegurar que la carga inicial desde disco solo se haga una vez
+    var cargadoInicialmente by rememberSaveable { mutableStateOf(false) }
+
+    // --- FUNCIONES DE PERSISTENCIA ---
+
+    fun guardarEstadoJuego() {
+        sharedPrefs.edit().apply {
+            // Guardamos el tablero como una sola cadena de 9 dígitos (ej: "120102000")
+            putString(KEY_TABLERO, tablero.joinToString(""))
+
+            // Guardamos los puntajes y estados
+            putInt(KEY_VICTORIAS_JUGADOR, victoriasJugador)
+            putInt(KEY_VICTORIAS_COMPUTADOR, victoriasComputador)
+            putInt(KEY_EMPATES, empates)
+            putBoolean(KEY_JUEGO_TERMINADO, juegoTerminado)
+            putString(KEY_TEXTO_ESTADO, textoEstado)
+            putBoolean(KEY_TURNO_ANDROID, turnoAndroid)
+
+            apply()
+        }
+        Log.d("Triqui", "Estado de juego guardado.")
+    }
+
+    fun cargarEstadoJuego(): Boolean {
+        val tableroString = sharedPrefs.getString(KEY_TABLERO, null)
+
+        if (tableroString != null && tableroString.length == TriquiJuego.TABLERO_TAM) {
+            // Cargar y actualizar los estados
+            tablero = tableroString.map { it.toString().toInt() }.toMutableList()
+            victoriasJugador = sharedPrefs.getInt(KEY_VICTORIAS_JUGADOR, 0)
+            victoriasComputador = sharedPrefs.getInt(KEY_VICTORIAS_COMPUTADOR, 0)
+            empates = sharedPrefs.getInt(KEY_EMPATES, 0)
+            juegoTerminado = sharedPrefs.getBoolean(KEY_JUEGO_TERMINADO, false)
+            textoEstado = sharedPrefs.getString(KEY_TEXTO_ESTADO, "Tu turno") ?: "Tu turno"
+            turnoAndroid = sharedPrefs.getBoolean(KEY_TURNO_ANDROID, !empiezaJugador)
+
+            return true // Indica que se cargó un estado guardado
+        }
+        return false // No hay juego guardado
+    }
+
+    // --- EFECTOS DE CICLO DE VIDA ---
+
+    // 1. Carga Inicial del Estado desde disco o inicio de juego nuevo
+    LaunchedEffect(Unit) {
+        if (!cargadoInicialmente) {
+            if (!cargarEstadoJuego()) {
+                // Si NO hay estado guardado (porque se navegó desde el menú), iniciamos limpio
+                juego = TriquiJuego()
+                tablero = juego.getTablero().toMutableList()
+                textoEstado = if (empiezaJugador) "Tu turno" else "Turno de Android"
+                turnoAndroid = !empiezaJugador
+                Log.d("Triqui", "No hay juego guardado, iniciando nuevo.")
+            } else {
+                Log.d("Triqui", "Juego restaurado desde SharedPreferences.")
+            }
+            cargadoInicialmente = true
+        }
+    }
+
+    // 2. Sincronización de la Lógica (para manejar la ROTACIÓN)
+    LaunchedEffect(tablero) {
+        if (tablero.any { it != 0 }) {
+            // Sincroniza el objeto de lógica 'juego' con el estado persistido/actual
+            juego.setTablero(tablero.toIntArray())
+        }
+    }
+
+    // 3. Guardar el estado al salir de la pantalla (Cierre de App o navegación atrás)
+    DisposableEffect(Unit) {
+        onDispose {
+            guardarEstadoJuego()
+        }
+    }
+
+    // --- RESTO DEL CÓDIGO (Igual que antes) ---
+
     val sonidoJugador = remember { MediaPlayer.create(context, R.raw.sonido_pup) }
     val sonidoAndroid = remember { MediaPlayer.create(context, R.raw.sonido_bip) }
 
-    // Función para reproducir sonidos de manera optimizada
     fun reproducirSonido(mp: MediaPlayer) {
-        if (mp.isPlaying) mp.seekTo(0) // reinicia si ya estaba sonando
+        if (mp.isPlaying) mp.seekTo(0)
         mp.start()
     }
 
-    // Carga de imágenes (painterResource cacheado por Compose)
     val xImage = painterResource(id = R.drawable.x_jugador)
     val oImage = painterResource(id = R.drawable.o_enemigo)
 
-    // Reiniciar todo el estado del juego
+    // Reiniciar
     fun reiniciarJuego() {
         juego = TriquiJuego()
-        tablero = juego.getTablero()
+        tablero = juego.getTablero().toMutableList()
         juegoTerminado = false
         turnoAndroid = !empiezaJugador
         textoEstado = if (empiezaJugador) "Tu turno" else "Turno de Android"
         Log.d("Triqui", "Nuevo juego iniciado")
+        // No borramos el SharedPreferences aquí, simplemente el estado de Compose se reinicia.
     }
 
-    // Turno del Android: se ejecuta automáticamente usando corutinas
     LaunchedEffect(turnoAndroid) {
+        // Ejecución de la jugada de Android (lógica idéntica)
         if (turnoAndroid && !juegoTerminado) {
-            delay(500) // pequeño retraso para dar sensación de "pensar"
+            delay(500)
             val jugada = juego.jugadaComputador(dificultad)
             if (juego.ponerJugada(TriquiJuego.COMPUTADOR, jugada)) {
-                tablero = juego.getTablero()
+                tablero = juego.getTablero().toMutableList()
                 reproducirSonido(sonidoAndroid)
                 Log.d("Triqui", "Android jugó en $jugada")
                 when (juego.verificarGanador()) {
@@ -90,44 +180,25 @@ fun PantallaJuego(navController: NavHostController) {
         }
     }
 
-    // Diseño principal de la pantalla
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .background(MaterialTheme.colorScheme.background),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // Spacer para empujar el contenido hacia el centro de la pantalla
-        Spacer(Modifier.weight(1f))
-
-        // Título del juego
-        Text("TRIQUI", style = MaterialTheme.typography.headlineLarge,color = MaterialTheme.colorScheme.onSurface)
-
-        Spacer(Modifier.height(12.dp))
-
-        // Tablero de juego
+    // --- Componente para el Tablero ---
+    @Composable
+    fun TableroTriqui() {
         Box(
             modifier = Modifier
                 .size(320.dp)
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
                         if (!juegoTerminado && !turnoAndroid) {
-                            // Convertimos dp a píxeles reales para que el cálculo funcione en cualquier densidad
                             val tableroSizePx = with(density) { 320.dp.toPx() }
                             val cellSize = tableroSizePx / 3
 
                             val col = (offset.x / cellSize).toInt()
                             val row = (offset.y / cellSize).toInt()
 
-                            // Validamos que el toque esté dentro de las celdas válidas
                             if (col in 0..2 && row in 0..2) {
                                 val index = row * 3 + col
-                                Log.d("Triqui", "Jugador tocó en fila=$row, col=$col, index=$index")
-
-                                // Si la jugada es válida, actualizamos el estado
                                 if (juego.ponerJugada(TriquiJuego.JUGADOR, index)) {
-                                    tablero = juego.getTablero()
+                                    tablero = juego.getTablero().toMutableList()
                                     reproducirSonido(sonidoJugador)
                                     when (juego.verificarGanador()) {
                                         0 -> { textoEstado = "Turno de Android"; turnoAndroid = true }
@@ -141,7 +212,7 @@ fun PantallaJuego(navController: NavHostController) {
                     }
                 }
         ) {
-            // Dibujar las líneas del tablero
+            // ... (Dibujo de líneas y fichas) ...
             Canvas(modifier = Modifier.matchParentSize()) {
                 val cellSize = size.width / 3
                 drawLine(Color.Gray, Offset(cellSize, 0f), Offset(cellSize, size.height), strokeWidth = 8f)
@@ -150,7 +221,6 @@ fun PantallaJuego(navController: NavHostController) {
                 drawLine(Color.Gray, Offset(0f, cellSize * 2), Offset(size.width, cellSize * 2), strokeWidth = 8f)
             }
 
-            // Dibujar fichas X y O en las posiciones correspondientes
             for (i in tablero.indices) {
                 val row = i / 3
                 val col = i % 3
@@ -176,31 +246,110 @@ fun PantallaJuego(navController: NavHostController) {
                 }
             }
         }
+    }
 
-        Spacer(Modifier.height(12.dp))
-        Text(textoEstado, style = MaterialTheme.typography.titleMedium,color = MaterialTheme.colorScheme.onSurface)
+    // ... (ControlesYPuntajesHorizontal y el resto del diseño permanecen igual) ...
 
-        Spacer(Modifier.height(12.dp))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Text("Jugador: $victoriasJugador",color = MaterialTheme.colorScheme.onSurface)
-            Text("Android: $victoriasComputador",color = MaterialTheme.colorScheme.onSurface)
-            Text("Empates: $empates",color = MaterialTheme.colorScheme.onSurface)
-        }
-
-        // Spacer para empujar los botones hacia abajo
-        Spacer(Modifier.weight(1f))
-
-        // Botones inferiores
-        Row(
+    @Composable
+    fun ControlesYPuntajesHorizontal() {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding(), // Respeta la barra de navegación del sistema
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .fillMaxHeight()
+                .padding(horizontal = 8.dp)
+                .fillMaxWidth(0.5f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Button(onClick = { reiniciarJuego() }) { Text("Nuevo Juego",color = MaterialTheme.colorScheme.onSurface) }
-            OutlinedButton(onClick = {
-                navController.popBackStack(Routes.Inicio, inclusive = false)
-            }) { Text("Volver al Inicio",color = MaterialTheme.colorScheme.onSurface) }
+            Text(textoEstado, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.height(24.dp))
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(8.dp))
+                Text("Jugador: $victoriasJugador", color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(8.dp))
+                Text("Android: $victoriasComputador", color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(8.dp))
+                Text("Empates: $empates", color = MaterialTheme.colorScheme.onSurface)
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Button(onClick = { reiniciarJuego() }, modifier = Modifier.fillMaxWidth(0.8f)) {
+                    Text("Nuevo Juego", color = MaterialTheme.colorScheme.onSurface)
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = {
+                    navController.popBackStack(Routes.Inicio, inclusive = false)
+                }, modifier = Modifier.fillMaxWidth(0.8f)) {
+                    Text("Volver al Inicio", color = MaterialTheme.colorScheme.onSurface)
+                }
+            }
+        }
+    }
+
+
+    // Diseño principal: usamos BoxWithConstraints para detectar la orientación
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        val esHorizontal = maxWidth > maxHeight
+
+        if (esHorizontal) {
+            // Diseño Horizontal (Row)
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TableroTriqui()
+                Spacer(Modifier.width(24.dp))
+                ControlesYPuntajesHorizontal()
+            }
+        } else {
+            // Diseño Vertical (Column)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Spacer(Modifier.weight(1f))
+
+                Text("TRIQUI", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(12.dp))
+
+                TableroTriqui()
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(textoEstado, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(12.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Text("Jugador: $victoriasJugador", color = MaterialTheme.colorScheme.onSurface)
+                    Text("Android: $victoriasComputador", color = MaterialTheme.colorScheme.onSurface)
+                    Text("Empates: $empates", color = MaterialTheme.colorScheme.onSurface)
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(onClick = { reiniciarJuego() }) { Text("Nuevo Juego", color = MaterialTheme.colorScheme.onSurface) }
+                    OutlinedButton(onClick = {
+                        navController.popBackStack(Routes.Inicio, inclusive = false)
+                    }) { Text("Volver al Inicio", color = MaterialTheme.colorScheme.onSurface) }
+                }
+            }
         }
     }
 }

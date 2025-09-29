@@ -3,16 +3,17 @@ package com.example.triqui;
 import java.util.Random;
 
 public class TriquiJuego {
-    public static final char JUGADOR = 'X';
-    public static final char COMPUTADOR = 'O';
-    public static final char VACIO = ' ';
+    // CAMBIO 1: Usamos INTs en lugar de CHARs para compatibilidad con Compose/rememberSaveable
+    public static final int JUGADOR = 1;
+    public static final int COMPUTADOR = 2;
+    public static final int VACIO = 0;
     public static final int TABLERO_TAM = 9;
 
-    private char[] tablero;
+    private int[] tablero; // CAMBIO 2: Tablero ahora es de tipo int[]
     private Random aleatorio;
 
     public TriquiJuego() {
-        tablero = new char[TABLERO_TAM];
+        tablero = new int[TABLERO_TAM];
         aleatorio = new Random();
         limpiarTablero();
     }
@@ -23,12 +24,23 @@ public class TriquiJuego {
         }
     }
 
-    public char[] getTablero() {
+    // MÉTODO REQUERIDO 1: getTablero ahora devuelve int[]
+    public int[] getTablero() {
         return tablero.clone();
     }
 
-    public boolean ponerJugada(char jugador, int posicion) {
-        if (tablero[posicion] == VACIO) {
+    // MÉTODO REQUERIDO 2: setTablero para restaurar el estado después de rotar
+    public void setTablero(int[] nuevoTablero) {
+        if (nuevoTablero.length == TABLERO_TAM) {
+            System.arraycopy(nuevoTablero, 0, this.tablero, 0, TABLERO_TAM);
+        } else {
+            // Manejo de error si el array es de tamaño incorrecto
+            limpiarTablero();
+        }
+    }
+
+    public boolean ponerJugada(int jugador, int posicion) { // CAMBIO 3: 'jugador' es de tipo int
+        if (posicion >= 0 && posicion < TABLERO_TAM && tablero[posicion] == VACIO) {
             tablero[posicion] = jugador;
             return true;
         }
@@ -39,15 +51,14 @@ public class TriquiJuego {
      * Jugada del computador según la dificultad seleccionada
      */
     public int jugadaComputador(String dificultad) {
+        // ... (La lógica de dificultad se mantiene igual, ya que usa los métodos auxiliares)
         if ("Fácil".equalsIgnoreCase(dificultad)) {
             return jugadaAleatoria();
         } else if ("Medio".equalsIgnoreCase(dificultad)) {
-            // Primero intenta ganar, si no, aleatorio
             int winMove = buscarJugadaGanadora(COMPUTADOR);
             if (winMove != -1) return winMove;
             return jugadaAleatoria();
         } else if ("Difícil".equalsIgnoreCase(dificultad)) {
-            // Primero intenta ganar, luego bloquear al jugador, si no, aleatorio
             int winMove = buscarJugadaGanadora(COMPUTADOR);
             if (winMove != -1) return winMove;
 
@@ -71,9 +82,8 @@ public class TriquiJuego {
 
     /**
      * Busca si el jugador puede ganar en la siguiente jugada.
-     * Si encuentra una casilla ganadora, devuelve su índice; si no, -1.
      */
-    private int buscarJugadaGanadora(char jugador) {
+    private int buscarJugadaGanadora(int jugador) { // CAMBIO 4: 'jugador' es de tipo int
         for (int i = 0; i < TABLERO_TAM; i++) {
             if (tablero[i] == VACIO) {
                 tablero[i] = jugador;
@@ -114,7 +124,7 @@ public class TriquiJuego {
         }
 
         // ¿Empate?
-        for (char c : tablero) {
+        for (int c : tablero) { // CAMBIO 5: Iteramos sobre int
             if (c == VACIO) return 0;
         }
         return 1;
