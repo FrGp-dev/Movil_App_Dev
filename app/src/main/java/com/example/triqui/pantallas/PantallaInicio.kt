@@ -86,7 +86,7 @@ fun ControlesSeleccion(
 }
 
 // ---------------------------
-// ControlesAccion (añadido param onIniciarMultijugador)
+// ControlesAccion
 // ---------------------------
 @Composable
 fun ControlesAccion(
@@ -183,18 +183,23 @@ fun PantallaInicio(navController: NavHostController) {
     val KEY_TABLERO = "tablero"
     val juegoGuardado = sharedPrefs.contains(KEY_TABLERO)
 
-    // ✅ CAMBIO CLAVE AQUÍ: Se modificó el bloque de navegación
+    // ✅ CAMBIO CLAVE AQUÍ: Lógica de navegación para JUEGO NUEVO
     val onIniciarJuegoNuevo = {
+        // Borramos el juego guardado si el usuario va a iniciar uno nuevo
         sharedPrefs.edit().remove(KEY_TABLERO).apply()
 
         // 1. Determinar el string de quien inicia ("jugador" o "android")
         val iniciaString = if (empiezaJugador) "jugador" else "android"
 
-        // 2. Navegar a la nueva ruta dinámica: Routes.Juego/iniciaString/dificultad
+        // 2. Navegar a la ruta dinámica: Routes.Juego/{inicia}/{dificultad}
         navController.navigate("${Routes.Juego}/$iniciaString/$dificultad")
     }
 
-    val onContinuarJuego = { navController.navigate(Routes.Juego) }
+    // ✅ CAMBIO CLAVE AQUÍ: Lógica de navegación para CONTINUAR JUEGO
+    val onContinuarJuego = {
+        // Navegamos a la ruta base simple (Routes.Juego), que activará la lógica de carga.
+        navController.navigate(Routes.Juego)
+    }
 
     // FUNCIÓN: crear/unirse a partida (se pasa como referencia para evitar devolución Job)
     fun iniciarMultijugador() {
@@ -399,26 +404,15 @@ fun PantallaInicio(navController: NavHostController) {
                 text = {
                     Column {
                         Text("Desarrollado por Fredy Alexander Gonzalez Pobre")
-                        Text("Universidad Nacional - Ing. de Sistemas y Computación", fontSize = 14.sp, color = Color.Gray)
+                        Text("Universidad Nacional")
                     }
                 },
                 confirmButton = {
                     TextButton(onClick = { mostrar_creditos = false }) {
-                        Text("Volver", color = Color(0xFF1CB72B), fontWeight = FontWeight.Bold)
+                        Text("Cerrar")
                     }
                 }
             )
-        }
-
-        if (creandoPartida) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = Color.White)
-            }
         }
     }
 }

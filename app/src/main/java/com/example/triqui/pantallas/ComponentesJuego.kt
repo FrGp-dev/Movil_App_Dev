@@ -78,8 +78,6 @@ fun TableroTriquiReutilizable(
     simboloJugadorLocal: Int, // 1 o 2 (Necesario para la celda)
     onCasillaClick: (pos: Int) -> Unit
 ) {
-    // Aquí puedes incluir el Canvas y la lógica de dibujo de líneas de tu TableroTriqui original
-    // Por ahora, solo usamos la estructura de Column/Row
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         for (i in 0 until 3) {
             Row {
@@ -96,7 +94,7 @@ fun TableroTriquiReutilizable(
     }
 }
 
-// 🧠 Función de verificación de ganador
+
 fun verificarGanadorInt(tablero: List<Int>): Int {
     val lineas = listOf(
         listOf(0, 1, 2), listOf(3, 4, 5), listOf(6, 7, 8), // Filas

@@ -17,6 +17,8 @@ object Routes {
     const val JuegoMultijugador = "juego_multijugador"
 }
 
+// TriquiNavigation.kt
+
 @Composable
 fun TriquiNavigation() {
     val navController = rememberNavController()
@@ -29,7 +31,12 @@ fun TriquiNavigation() {
             PantallaInicio(navController = navController)
         }
 
-        // ✅ RUTA CORREGIDA: Define los argumentos "inicia" y "dificultad"
+        // 1. RUTA BASE: Usada para "Continuar Juego"
+        composable(Routes.Juego) {
+            PantallaJuego(navController = navController)
+        }
+
+        // 2. RUTA CON ARGUMENTOS: Usada para "Iniciar Juego Nuevo"
         composable(
             route = "${Routes.Juego}/{inicia}/{dificultad}",
             arguments = listOf(
