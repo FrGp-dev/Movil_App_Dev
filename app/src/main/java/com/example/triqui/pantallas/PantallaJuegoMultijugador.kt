@@ -1,8 +1,7 @@
-// PantallaJuegoMultijugador.kt
-
 package com.example.triqui.pantallas
 
 import android.content.Context
+import android.media.MediaPlayer
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -11,23 +10,54 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import com.example.triqui.R
 import com.example.triqui.firebase.FirebaseManager
 import com.example.triqui.firebase.Partida
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ListenerRegistration
-// ✅ Importaciones de componentes compartidos
-import com.example.triqui.pantallas.TableroTriquiReutilizable
-import com.example.triqui.pantallas.verificarGanadorInt
-import com.example.triqui.pantallas.reproducirSonidoMovimiento
+
+
+// Constantes de compatibilidad con TableroTriqui y Firebase
+private const val JUGADOR_X = 1 // Simbolo Jugador 1 en Firebase
+private const val JUGADOR_O = 2 // Simbolo Jugador 2 en Firebase
+
+// --- Funciones Utilitarias (Sin cambios) ---
+fun verificarGanadorInt(tablero: List<Int>): Int {
+    val lineasGanadoras = listOf(
+        listOf(0, 1, 2), listOf(3, 4, 5), listOf(6, 7, 8),
+        listOf(0, 3, 6), listOf(1, 4, 7), listOf(2, 5, 8),
+        listOf(0, 4, 8), listOf(2, 4, 6)
+    )
+    for (linea in lineasGanadoras) {
+        val (a, b, c) = linea
+        if (tablero[a] != 0 && tablero[a] == tablero[b] && tablero[a] == tablero[c]) {
+            return tablero[a]
+        }
+    }
+    return 0
+}
+
+fun reproducirSonidoMovimiento(context: Context, simboloJugado: Int) {
+    val sonidoId = if (simboloJugado == JUGADOR_X) R.raw.sonido_pup else R.raw.sonido_bip
+    val mp = MediaPlayer.create(context, sonidoId)
+    if (mp.isPlaying) mp.seekTo(0)
+    mp.start()
+    mp.setOnCompletionListener { it.release() }
+}
+// -----------------------------------------------------------------
+
 
 @Composable
 fun PantallaJuegoMultijugador(navController: NavHostController) {
     val auth = FirebaseAuth.getInstance()
     val uid = auth.currentUser?.uid ?: "anon"
-    val context = LocalContext.current // Contexto para sonidos
+    val context = LocalContext.current
+    val density = LocalDensity.current
 
     val firebaseManager = remember { FirebaseManager() }
 
@@ -36,12 +66,38 @@ fun PantallaJuegoMultijugador(navController: NavHostController) {
     var esperandoOponente by remember { mutableStateOf(true) }
     var listenerRegistration by remember { mutableStateOf<ListenerRegistration?>(null) }
 
-    // Determinar qué símbolo representa este jugador (1: X o 2: O)
+    // Estado clave para que el JUGADOR RESTANTE navegue fuera
+    var partidaEliminada by remember { mutableStateOf(false) }
+
+    val xImage = painterResource(id = R.drawable.x_jugador)
+    val oImage = painterResource(id = R.drawable.o_enemigo)
+
     val simboloJugadorLocal = remember(partida.jugador1, uid) {
-        if (uid == partida.jugador1) 1 else 2
+        if (uid == partida.jugador1) JUGADOR_X else JUGADOR_O
     }
 
-    // 🔹 Inicialización: Obtener ID de Navegación y empezar a escuchar
+    val juegoTerminado = partida.estado != "en_juego" && partida.estado != "esperando"
+    val esMiTurno = partida.turno == simboloJugadorLocal
+
+    // 🔹 Lógica de Desconexión / Abandono
+    val manejarSalida: () -> Unit = {
+        val id = partidaId
+
+        // ✅ CORRECCIÓN CRÍTICA: Remover el listener ANTES de eliminar y ANTES de navegar
+        listenerRegistration?.remove()
+        listenerRegistration = null
+
+        if (id != null) {
+            // Eliminar la partida de Firestore. Esto es robusto para forzar la salida del rival.
+            firebaseManager.eliminarPartida(id)
+        }
+
+        // Navegamos directamente al salir por el botón
+        navController.popBackStack()
+    }
+
+
+    // 🔹 Inicialización y Listener
     LaunchedEffect(Unit) {
         val idPasado = navController.previousBackStackEntry
             ?.savedStateHandle
@@ -50,31 +106,49 @@ fun PantallaJuegoMultijugador(navController: NavHostController) {
         if (idPasado != null) {
             partidaId = idPasado
 
-            listenerRegistration = firebaseManager.escucharPartida(idPasado) {
-                partida = it
-                // El juego empieza cuando jugador2 no está vacío
-                esperandoOponente = it.jugador2.isEmpty()
+            listenerRegistration = firebaseManager.escucharPartida(idPasado) { part ->
+
+                // Si el listener recibe el estado "eliminada" (por borrado de documento)
+                if (part.estado == "eliminada") {
+                    partidaEliminada = true // Activa el LaunchedEffect de navegación
+                    // No hacemos return aquí, el listener se removerá al salir
+                }
+
+                partida = part
+                esperandoOponente = part.jugador2.isEmpty()
             }
         }
     }
 
-    // 🔹 Limpieza del Listener al salir de la pantalla
+    // ✅ LaunchedEffect: Ejecuta la navegación cuando la bandera es activada por el listener
+    LaunchedEffect(partidaEliminada) {
+        if (partidaEliminada) {
+            // Aseguramos que el listener esté inactivo antes de navegar (para el JUGADOR RESTANTE)
+            listenerRegistration?.remove()
+            listenerRegistration = null
+            navController.popBackStack()
+        }
+    }
+
+
+    // 🔹 DisposableEffect: Limpieza del listener
     DisposableEffect(key1 = Unit) {
         onDispose {
+            // El listener se remueve aquí solo si la salida fue forzada por el sistema (ej. App cerrada)
+            // En el caso del botón, ya se habrá removido en manejarSalida
             listenerRegistration?.remove()
         }
     }
 
-    // ✅ Acción: Reiniciar ronda (mantiene puntajes)
+    // ✅ Acción: Reiniciar ronda
     fun reiniciarRonda() {
         partidaId?.let {
-            // Reiniciar el tablero, turno (siempre J1) y estado
             firebaseManager.actualizarEstadoDeJuego(
                 partidaId = it,
-                tablero = List(9) { 0 }, // Tablero vacío
-                turno = 1, // Siempre inicia el Jugador 1
-                estado = "en_juego", // Vuelve al estado de juego
-                winner = 0, // Reiniciar ganador
+                tablero = List(9) { 0 },
+                turno = JUGADOR_X,
+                estado = "en_juego",
+                winner = 0,
                 victoriasJ1 = partida.victoriasJugador1,
                 victoriasJ2 = partida.victoriasJugador2
             )
@@ -84,23 +158,17 @@ fun PantallaJuegoMultijugador(navController: NavHostController) {
     // 🔹 Acción: marcar casilla y actualizar puntaje
     fun jugar(pos: Int) {
         val miNumero = simboloJugadorLocal
-        val esMiTurno = partida.turno == miNumero
+        if (!esMiTurno || juegoTerminado || partida.tablero[pos] != 0) return
 
-        // Comprobación de reglas
-        if (!esMiTurno || partida.estado != "en_juego" || partida.tablero[pos] != 0) return
-
-        // Simulación de movimiento
         val nuevoTablero = partida.tablero.toMutableList()
         nuevoTablero[pos] = miNumero
 
-        // ✅ Reproducir el sonido propio
-        reproducirSonidoMovimiento(context, miNumero, miNumero)
+        reproducirSonidoMovimiento(context, miNumero)
 
         val ganador = verificarGanadorInt(nuevoTablero)
         val terminado = ganador != 0 || nuevoTablero.none { it == 0 }
 
-        // Determinar siguiente estado y turno
-        val siguienteTurno = if (miNumero == 1) 2 else 1
+        val siguienteTurno = if (miNumero == JUGADOR_X) JUGADOR_O else JUGADOR_X
 
         val nuevoEstado = when {
             ganador != 0 -> "terminado"
@@ -108,21 +176,18 @@ fun PantallaJuegoMultijugador(navController: NavHostController) {
             else -> "en_juego"
         }
 
-        // El turno no debe cambiar si el juego terminó
         val turnoFinal = if (terminado) partida.turno else siguienteTurno
 
-        // 5. Actualización de puntaje y ganador
         var newWinner = 0
         var newVictoriasJ1 = partida.victoriasJugador1
         var newVictoriasJ2 = partida.victoriasJugador2
 
         if (ganador != 0) {
-            newWinner = ganador // 1 o 2
-            if (ganador == 1) newVictoriasJ1++
-            if (ganador == 2) newVictoriasJ2++
+            newWinner = ganador
+            if (ganador == JUGADOR_X) newVictoriasJ1++
+            if (ganador == JUGADOR_O) newVictoriasJ2++
         }
 
-        // 6. Actualizar Firebase
         partidaId?.let {
             firebaseManager.actualizarEstadoDeJuego(
                 partidaId = it,
@@ -136,40 +201,27 @@ fun PantallaJuegoMultijugador(navController: NavHostController) {
         }
     }
 
-    // 🔹 Interfaz principal
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF1E1E1E)),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Triqui Multijugador",
-            color = Color.White,
-            fontSize = 26.sp
-        )
+    // --- Componentes Reutilizables de UI ---
 
-        Spacer(Modifier.height(20.dp))
+    @Composable
+    fun EstadoYBotones(esHorizontal: Boolean = false) {
+        val mod = if (esHorizontal) Modifier.fillMaxWidth(0.5f).padding(horizontal = 16.dp) else Modifier.fillMaxWidth()
 
-        if (esperandoOponente) {
-            Text(
-                "Esperando a que otro jugador se una... ID Partida: ${partidaId ?: "Cargando..."}",
-                color = Color.Yellow,
-                fontSize = 18.sp
-            )
-        } else {
+        Column(
+            modifier = mod,
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = if (esHorizontal) Arrangement.Center else Arrangement.Top
+        ) {
             // Mostrar estado del juego
             Text(
                 text = when {
+                    partida.estado == "abandonada" || partidaEliminada -> "Partida Terminada (Rival Desconectado)"
                     partida.winner != 0 -> "¡Ganó Jugador ${partida.winner}!"
                     partida.estado == "empate" -> "¡Empate!"
-                    partida.estado == "terminado" -> "Ronda Terminada"
+                    juegoTerminado -> "Ronda Terminada"
                     partida.estado == "en_juego" -> {
                         val miNumero = simboloJugadorLocal
-                        val turnoEsMiNumero = partida.turno == miNumero
-
-                        if (turnoEsMiNumero) "¡Es tu turno (${if (miNumero == 1) "X" else "O"})!"
+                        if (esMiTurno) "¡Es tu turno (${if (miNumero == JUGADOR_X) "X" else "O"})!"
                         else "Turno del oponente"
                     }
                     else -> "Estado desconocido"
@@ -180,36 +232,33 @@ fun PantallaJuegoMultijugador(navController: NavHostController) {
 
             Spacer(Modifier.height(12.dp))
 
-            // ✅ Llama al componente reutilizable del tablero
-            TableroTriquiReutilizable(
-                tablero = partida.tablero,
-                simboloJugadorLocal = simboloJugadorLocal,
-                onCasillaClick = ::jugar
-            )
+            // Mostrar Puntajes (Scoreboard)
+            val esJugador1 = uid == partida.jugador1
+            val miSimbolo = if (esJugador1) "X" else "O"
+            val miPuntaje = if (esJugador1) partida.victoriasJugador1 else partida.victoriasJugador2
+            val rivalPuntaje = if (esJugador1) partida.victoriasJugador2 else partida.victoriasJugador1
 
-            Spacer(Modifier.height(24.dp))
-
-            // ✅ Mostrar Puntajes (Scoreboard)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                val esJugador1 = uid == partida.jugador1
-                val miSimbolo = if (esJugador1) "X" else "O"
-                val miPuntaje = if (esJugador1) partida.victoriasJugador1 else partida.victoriasJugador2
-                val rivalPuntaje = if (esJugador1) partida.victoriasJugador2 else partida.victoriasJugador1
-
-                Text("Yo ($miSimbolo): $miPuntaje", color = Color.Cyan, fontSize = 16.sp)
-                Text("Rival: $rivalPuntaje", color = Color.Red, fontSize = 16.sp)
+            if (esHorizontal) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Yo ($miSimbolo): $miPuntaje", color = Color.Cyan, fontSize = 16.sp)
+                    Text("Rival: $rivalPuntaje", color = Color.Red, fontSize = 16.sp)
+                }
+            } else {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Text("Yo ($miSimbolo): $miPuntaje", color = Color.Cyan, fontSize = 16.sp)
+                    Text("Rival: $rivalPuntaje", color = Color.Red, fontSize = 16.sp)
+                }
             }
 
             Spacer(Modifier.height(24.dp))
 
             // Botón de Reinicio (solo si el juego terminó o hay empate)
-            if (partida.estado != "en_juego" && !esperandoOponente) {
+            if (partida.estado != "en_juego" && partida.estado != "esperando") {
                 Button(
                     onClick = { reiniciarRonda() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
+                    modifier = Modifier.fillMaxWidth(if (esHorizontal) 0.8f else 1f),
+                    enabled = !partidaEliminada
                 ) {
                     Text("Jugar de Nuevo", color = Color.White)
                 }
@@ -218,10 +267,87 @@ fun PantallaJuegoMultijugador(navController: NavHostController) {
 
             // Botón de Volver al inicio
             Button(
-                onClick = { navController.popBackStack() },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                onClick = manejarSalida,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                modifier = Modifier.fillMaxWidth(if (esHorizontal) 0.8f else 1f)
             ) {
                 Text("Volver al inicio", color = Color.White)
+            }
+        }
+    }
+
+
+    // -----------------------------------------------------
+    //                  Diseño Principal
+    // -----------------------------------------------------
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .background(Color(0xFF1E1E1E))
+    ) {
+        val esHorizontal = maxWidth > maxHeight
+
+        if (esperandoOponente && !partidaEliminada) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("Triqui Multijugador", color = Color.White, fontSize = 26.sp)
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    "Esperando a que otro jugador se una... ID Partida: ${partidaId ?: "Cargando..."}",
+                    color = Color.Yellow,
+                    fontSize = 18.sp
+                )
+            }
+        } else if (esHorizontal) {
+            // Diseño Horizontal (Row)
+            Row(
+                modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Tablero
+                TableroTriqui(
+                    tablero = partida.tablero,
+                    xImage = xImage,
+                    oImage = oImage,
+                    density = density,
+                    juegoTerminado = juegoTerminado,
+                    turnoAndroid = !esMiTurno,
+                    onCeldaClick = ::jugar
+                )
+                Spacer(Modifier.width(24.dp))
+                // Estado y Controles
+                EstadoYBotones(esHorizontal = true)
+            }
+        } else {
+            // Diseño Vertical (Column)
+            Column(
+                modifier = Modifier.fillMaxSize().navigationBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Spacer(Modifier.weight(1f))
+                Text("Triqui Multijugador", color = Color.White, fontSize = 26.sp)
+                Spacer(Modifier.height(12.dp))
+
+                // Tablero
+                TableroTriqui(
+                    tablero = partida.tablero,
+                    xImage = xImage,
+                    oImage = oImage,
+                    density = density,
+                    juegoTerminado = juegoTerminado,
+                    turnoAndroid = !esMiTurno,
+                    onCeldaClick = ::jugar
+                )
+
+                Spacer(Modifier.height(24.dp))
+                EstadoYBotones(esHorizontal = false)
+                Spacer(Modifier.weight(1f))
             }
         }
     }

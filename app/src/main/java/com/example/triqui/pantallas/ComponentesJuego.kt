@@ -1,113 +1,150 @@
-// ComponentesJuego.kt (Crear este archivo)
-
 package com.example.triqui.pantallas
 
-import android.content.Context
-import android.media.MediaPlayer
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import com.example.triqui.R // Asegúrate de que esta importación sea correcta
+import androidx.navigation.NavHostController
+import com.example.triqui.TriquiJuego
+import com.example.triqui.navigation.Routes
 
-
-fun reproducirSonidoMovimiento(context: Context, simboloLocal: Int, valorCasilla: Int) {
-    if (valorCasilla == 0) return // No reproducir si no hay movimiento
-
-    val esMovimientoPropio = (valorCasilla == simboloLocal)
-    // Asume R.raw.move_propio y R.raw.move_oponente son tus IDs de recursos de sonido
-    val sonidoResId = if (esMovimientoPropio) {
-        R.raw.sonido_bip
-    } else {
-        R.raw.sonido_pup
-    }
-
-    try {
-        // Ejecutar sonido
-        MediaPlayer.create(context, sonidoResId)?.start()
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-}
-
-// 🖼️ Composable reutilizable de la casilla (Tu CajaCasilla con iconos y lógica de click)
+/**
+ * Componente Composable que renderiza el tablero del Triqui y maneja las interacciones táctiles.
+ *
+ * @param tablero Lista que representa el estado actual de las celdas (0=vacío, 1=Jugador, 2=Android).
+ * @param xImage Painter para la ficha del jugador (X).
+ * @param oImage Painter para la ficha del computador (O).
+ * @param density Objeto Density para convertir dp a pixeles.
+ * @param juegoTerminado Indica si el juego ha finalizado (para bloquear clics).
+ * @param turnoAndroid Indica si es el turno de Android (para bloquear clics del jugador).
+ * @param onCeldaClick Lambda que se ejecuta al tocar una celda válida, devuelve el índice (0-8).
+ */
 @Composable
-fun CajaCasilla(
-    valor: Int, // 0: vacía, 1: Jugador 1 (X), 2: Jugador 2 (O)
-    simboloJugadorLocal: Int, // 1 o 2
-    onClick: () -> Unit
+fun TableroTriqui(
+    tablero: List<Int>,
+    xImage: Painter,
+    oImage: Painter,
+    density: Density,
+    juegoTerminado: Boolean,
+    turnoAndroid: Boolean,
+    onCeldaClick: (Int) -> Unit
 ) {
-    // Reemplaza con tus IDs de recursos de imágenes
-    val recursoIcono = when (valor) {
-        1 -> R.drawable.o_enemigo
-        2 -> R.drawable.x_jugador
-        else -> null
-    }
+    val boardSizeDp = 320.dp
 
     Box(
         modifier = Modifier
-            .size(100.dp)
-            .padding(4.dp)
-            .background(Color.DarkGray)
-            .clickable {
-                // Solo permite el click si la casilla está vacía
-                if (valor == 0) onClick()
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        recursoIcono?.let {
-            Image(
-                painter = painterResource(id = it),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(0.8f)
-            )
-        }
-    }
-}
+            .size(boardSizeDp)
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    if (!juegoTerminado && !turnoAndroid) {
+                        val tableroSizePx = with(density) { boardSizeDp.toPx() }
+                        val cellSize = tableroSizePx / 3
 
-// 🖼️ Composable reutilizable del Tablero
-@Composable
-fun TableroTriquiReutilizable(
-    tablero: List<Int>,
-    simboloJugadorLocal: Int, // 1 o 2 (Necesario para la celda)
-    onCasillaClick: (pos: Int) -> Unit
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        for (i in 0 until 3) {
-            Row {
-                for (j in 0 until 3) {
-                    val index = i * 3 + j
-                    CajaCasilla(
-                        valor = tablero[index],
-                        simboloJugadorLocal = simboloJugadorLocal,
-                        onClick = { onCasillaClick(index) }
-                    )
+                        val col = (offset.x / cellSize).toInt()
+                        val row = (offset.y / cellSize).toInt()
+
+                        if (col in 0..2 && row in 0..2) {
+                            val index = row * 3 + col
+                            onCeldaClick(index)
+                        }
+                    }
                 }
+            }
+    ) {
+        // --- 1. Dibujo de las Líneas del Tablero ---
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val cellSize = size.width / 3
+            drawLine(Color.Gray, Offset(cellSize, 0f), Offset(cellSize, size.height), strokeWidth = 8f)
+            drawLine(Color.Gray, Offset(cellSize * 2, 0f), Offset(cellSize * 2, size.height), strokeWidth = 8f)
+            drawLine(Color.Gray, Offset(0f, cellSize), Offset(size.width, cellSize), strokeWidth = 8f)
+            drawLine(Color.Gray, Offset(0f, cellSize * 2), Offset(size.width, cellSize * 2), strokeWidth = 8f)
+        }
+
+        // --- 2. Dibujo de las Fichas (X y O) ---
+        for (i in tablero.indices) {
+            val row = i / 3
+            val col = i % 3
+            val offsetDp = 320f / 3
+
+            val offsetX = col * offsetDp
+            val offsetY = row * offsetDp
+
+            val imagePainter = when (tablero[i]) {
+                TriquiJuego.JUGADOR -> xImage
+                TriquiJuego.COMPUTADOR -> oImage
+                else -> null
+            }
+
+            if (imagePainter != null) {
+                Image(
+                    painter = imagePainter,
+                    contentDescription = if (tablero[i] == TriquiJuego.JUGADOR) "Jugador" else "Android",
+                    modifier = Modifier
+                        .size(100.dp)
+                        .offset(x = offsetX.dp, y = offsetY.dp)
+                )
             }
         }
     }
 }
 
+/**
+ * Componente que muestra los puntajes y los botones de control para la vista horizontal.
+ */
+@Composable
+fun ControlesYPuntajesHorizontal(
+    textoEstado: String,
+    victoriasJugador: Int,
+    victoriasComputador: Int,
+    empates: Int,
+    onReiniciarJuego: () -> Unit,
+    navController: NavHostController
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .padding(horizontal = 8.dp)
+            .fillMaxWidth(0.5f),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(textoEstado, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(24.dp))
 
-fun verificarGanadorInt(tablero: List<Int>): Int {
-    val lineas = listOf(
-        listOf(0, 1, 2), listOf(3, 4, 5), listOf(6, 7, 8), // Filas
-        listOf(0, 3, 6), listOf(1, 4, 7), listOf(2, 5, 8), // Columnas
-        listOf(0, 4, 8), listOf(2, 4, 6)                  // Diagonales
-    )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(Modifier.height(8.dp))
+            Text("Jugador: $victoriasJugador", color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.height(8.dp))
+            Text("Android: $victoriasComputador", color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.height(8.dp))
+            Text("Empates: $empates", color = MaterialTheme.colorScheme.onSurface)
+        }
 
-    for (linea in lineas) {
-        if (tablero[linea[0]] != 0 &&
-            tablero[linea[0]] == tablero[linea[1]] &&
-            tablero[linea[1]] == tablero[linea[2]]) {
-            return tablero[linea[0]]
+        Spacer(Modifier.height(24.dp))
+
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Button(onClick = onReiniciarJuego, modifier = Modifier.fillMaxWidth(0.8f)) {
+                Text("Nuevo Juego", color = MaterialTheme.colorScheme.onSurface)
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = {
+                navController.popBackStack(Routes.Inicio, inclusive = false)
+            }, modifier = Modifier.fillMaxWidth(0.8f)) {
+                Text("Volver al Inicio", color = MaterialTheme.colorScheme.onSurface)
+            }
         }
     }
-    return 0
 }
