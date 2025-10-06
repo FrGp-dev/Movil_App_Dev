@@ -158,7 +158,11 @@ fun PantallaJuegoMultijugador(navController: NavHostController) {
     // 🔹 Acción: marcar casilla y actualizar puntaje
     fun jugar(pos: Int) {
         val miNumero = simboloJugadorLocal
-        if (!esMiTurno || juegoTerminado || partida.tablero[pos] != 0) return
+        if (partida.turno != miNumero ||
+            partida.estado != "en_juego" ||
+            partida.tablero[pos] != 0) {
+            return
+        }
 
         val nuevoTablero = partida.tablero.toMutableList()
         nuevoTablero[pos] = miNumero
