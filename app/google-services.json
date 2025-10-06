@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1024107166723",
+    "project_id": "triqui-multiplayer-dadm",
+    "storage_bucket": "triqui-multiplayer-dadm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1024107166723:android:5292c9f6bc7c0f120ca236",
+        "android_client_info": {
+          "package_name": "com.example.triqui"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcvIOumoXUhhYKoG84ezbQE5LxQnf68_M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

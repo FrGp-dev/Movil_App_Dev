@@ -1,6 +1,5 @@
 package com.example.triqui.pantallas
 
-
 import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
@@ -21,8 +20,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.triqui.navigation.Routes
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlin.random.Random
 
-// Contenido principal del menú (Selector de Quién Empieza y Dificultad)
+
 @Composable
 fun ControlesSeleccion(
     empiezaJugador: Boolean,
@@ -34,9 +38,9 @@ fun ControlesSeleccion(
     val opciones = listOf("Fácil", "Medio", "Difícil")
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Selector: quién empieza
         Text("¿Quién empieza?", fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
+
         Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth(0.9f)) {
             OutlinedButton(
                 onClick = { onEmpiezaJugadorChange(true) },
@@ -55,10 +59,9 @@ fun ControlesSeleccion(
         }
 
         Spacer(Modifier.height(16.dp))
-
-        // Selector de dificultad
         Text("Dificultad", fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
+
         Box {
             Button(
                 onClick = { expanded = true },
@@ -82,21 +85,19 @@ fun ControlesSeleccion(
     }
 }
 
-// Controles de Acción (Iniciar/Continuar/Salir)
+// ---------------------------
+// ControlesAccion (añadido param onIniciarMultijugador)
+// ---------------------------
 @Composable
 fun ControlesAccion(
     onIniciarJuego: () -> Unit,
     onMostrarAlerta: () -> Unit,
+    onIniciarMultijugador: () -> Unit,
     fillWidthFactor: Float = 0.7f,
-    // Parámetros de persistencia
     juegoGuardado: Boolean,
     onContinuarJuego: () -> Unit
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        // 1. Botón Continuar (Condicional)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         if (juegoGuardado) {
             Button(
                 onClick = onContinuarJuego,
@@ -105,22 +106,15 @@ fun ControlesAccion(
                     .height(56.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2)),
-                // CORRECCIÓN: Usamos un Row con Alignment para forzar el centrado
                 contentPadding = PaddingValues(0.dp)
             ) {
-                // Usamos Row para centrar el Text horizontalmente
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                     Text("Continuar juego", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
             Spacer(Modifier.height(10.dp))
         }
 
-        // 2. Botón principal: Iniciar Juego Nuevo
         Button(
             onClick = onIniciarJuego,
             modifier = Modifier
@@ -128,22 +122,32 @@ fun ControlesAccion(
                 .height(56.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-            // CORRECCIÓN: Usamos un Row con Alignment para forzar el centrado
             contentPadding = PaddingValues(0.dp)
         ) {
-            // Usamos Row para centrar el Text horizontalmente
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 Text("Iniciar juego nuevo", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
 
         Spacer(Modifier.height(10.dp))
 
-        // 3. Botón Salir (no requiere corrección ya que usa un fontSize más pequeño)
+        // Botón Multijugador
+        Button(
+            onClick = onIniciarMultijugador,
+            modifier = Modifier
+                .fillMaxWidth(fillWidthFactor)
+                .height(56.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8E24AA)),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Text("Modo Multijugador", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
         OutlinedButton(
             onClick = onMostrarAlerta,
             modifier = Modifier
@@ -158,49 +162,102 @@ fun ControlesAccion(
     }
 }
 
-// --------------------------------------------------------------------------------------
-
+// ---------------------------
+// PantallaInicio (completa)
+// ---------------------------
 @Composable
 fun PantallaInicio(navController: NavHostController) {
     var empiezaJugador by rememberSaveable { mutableStateOf(true) }
     var dificultad by rememberSaveable { mutableStateOf("Fácil") }
     val activity = LocalActivity.current
+    val context = LocalContext.current
     var mostrar_alerta by remember { mutableStateOf(false) }
     var mostrar_creditos by remember { mutableStateOf(false) }
+    var creandoPartida by remember { mutableStateOf(false) }
 
-    // Acceso a SharedPreferences y clave del tablero
-    val context = LocalContext.current
+
+    val firestore = FirebaseFirestore.getInstance()
+    val scope = rememberCoroutineScope()
+
     val sharedPrefs = context.getSharedPreferences("TriquiPrefs", Context.MODE_PRIVATE)
     val KEY_TABLERO = "tablero"
-
-    // Estado que verifica si hay un juego guardado
     val juegoGuardado = sharedPrefs.contains(KEY_TABLERO)
 
-    // Función para iniciar juego nuevo: borra el estado guardado
+    // ✅ CAMBIO CLAVE AQUÍ: Se modificó el bloque de navegación
     val onIniciarJuegoNuevo = {
-        // 1. Limpiamos el estado guardado para forzar que PantallaJuego inicie un juego nuevo
         sharedPrefs.edit().remove(KEY_TABLERO).apply()
 
-        // 2. Navegamos al juego con los nuevos parámetros de inicio
-        navController.currentBackStackEntry?.savedStateHandle?.set("empiezaJugador", empiezaJugador)
-        navController.currentBackStackEntry?.savedStateHandle?.set("dificultad", dificultad)
-        navController.navigate(Routes.Juego)
+        // 1. Determinar el string de quien inicia ("jugador" o "android")
+        val iniciaString = if (empiezaJugador) "jugador" else "android"
+
+        // 2. Navegar a la nueva ruta dinámica: Routes.Juego/iniciaString/dificultad
+        navController.navigate("${Routes.Juego}/$iniciaString/$dificultad")
     }
 
-    // Función para continuar juego: NO borra el estado guardado
-    val onContinuarJuego = {
-        // Al NO borrar KEY_TABLERO, PantallaJuego lo detectará y lo cargará.
-        navController.navigate(Routes.Juego)
+    val onContinuarJuego = { navController.navigate(Routes.Juego) }
+
+    // FUNCIÓN: crear/unirse a partida (se pasa como referencia para evitar devolución Job)
+    fun iniciarMultijugador() {
+        scope.launch {
+            creandoPartida = true
+            try {
+                // 1) Asegurar autenticación anónima (para identificar jugadores)
+                val auth = FirebaseAuth.getInstance()
+                var user = auth.currentUser
+                if (user == null) {
+                    // sign in anonymously (suspend via await)
+                    try {
+                        auth.signInAnonymously().await()
+                    } catch (e: Exception) {
+                        // si falla, generamos un id local temporal
+                    }
+                    user = auth.currentUser
+                }
+                val uid = user?.uid ?: "anon${Random.nextInt(1000, 9999)}"
+
+                // 2) Buscar partida esperando
+                val partidasRef = firestore.collection("partidas")
+                val partidaDisponible = partidasRef
+                    .whereEqualTo("estado", "esperando")
+                    .limit(1)
+                    .get()
+                    .await()
+
+                if (!partidaDisponible.isEmpty) {
+                    // Unirse a la primera partida disponible
+                    val doc = partidaDisponible.documents.first()
+                    doc.reference.update(mapOf("jugador2" to uid, "estado" to "en_juego")).await()
+                    navController.currentBackStackEntry?.savedStateHandle?.set("partidaId", doc.id)
+                    navController.currentBackStackEntry?.savedStateHandle?.set("modoMultijugador", true)
+                    navController.navigate(Routes.JuegoMultijugador)
+                } else {
+                    // Crear nueva partida
+                    val nuevaPartidaMap = mapOf(
+                        "jugador1" to uid,
+                        "jugador2" to "",
+                        "tablero" to List(9) { 0 }, // lista de Int
+                        "turno" to 1,
+                        "estado" to "esperando",
+                        "winner" to 0
+                    )
+                    val nuevaPartida = partidasRef.add(nuevaPartidaMap).await()
+                    navController.currentBackStackEntry?.savedStateHandle?.set("partidaId", nuevaPartida.id)
+                    navController.currentBackStackEntry?.savedStateHandle?.set("modoMultijugador", true)
+                    navController.navigate(Routes.JuegoMultijugador)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                creandoPartida = false
+            }
+        }
     }
 
+    // --------------------------- UI ---------------------------
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF3F51B5), Color(0xFF81D4FA))
-                )
-            )
+            .background(Brush.verticalGradient(listOf(Color(0xFF3F51B5), Color(0xFF81D4FA))))
             .navigationBarsPadding(),
         contentAlignment = Alignment.TopCenter
     ) {
@@ -214,9 +271,7 @@ fun PantallaInicio(navController: NavHostController) {
                 .padding(horizontal = 24.dp)
                 .align(Alignment.TopCenter)
         ) {
-            if (!esHorizontal) {
-                Spacer(Modifier.weight(1f))
-            }
+            if (!esHorizontal) Spacer(Modifier.weight(1f))
 
             AnimatedContent(targetState = "Bienvenido al Triqui") { titulo ->
                 Text(
@@ -238,7 +293,6 @@ fun PantallaInicio(navController: NavHostController) {
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
                 if (esHorizontal) {
-                    // --- DISEÑO HORIZONTAL (Dos Columnas) ---
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -247,23 +301,16 @@ fun PantallaInicio(navController: NavHostController) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        // Columna 1: Selección (Izquierda)
                         Column(
                             modifier = Modifier.weight(1f),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            ControlesSeleccion(
-                                empiezaJugador = empiezaJugador,
-                                onEmpiezaJugadorChange = { empiezaJugador = it },
-                                dificultad = dificultad,
-                                onDificultadChange = { dificultad = it }
-                            )
+                            ControlesSeleccion(empiezaJugador, { empiezaJugador = it }, dificultad, { dificultad = it })
                         }
 
                         Spacer(Modifier.width(32.dp))
 
-                        // Columna 2: Acciones (Derecha)
                         Column(
                             modifier = Modifier.weight(1f),
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -272,6 +319,7 @@ fun PantallaInicio(navController: NavHostController) {
                             ControlesAccion(
                                 onIniciarJuego = onIniciarJuegoNuevo,
                                 onMostrarAlerta = { mostrar_alerta = true },
+                                onIniciarMultijugador = ::iniciarMultijugador,
                                 fillWidthFactor = 1f,
                                 juegoGuardado = juegoGuardado,
                                 onContinuarJuego = onContinuarJuego
@@ -279,7 +327,6 @@ fun PantallaInicio(navController: NavHostController) {
                         }
                     }
                 } else {
-                    // --- DISEÑO VERTICAL (Columna) ---
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -287,18 +334,12 @@ fun PantallaInicio(navController: NavHostController) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        ControlesSeleccion(
-                            empiezaJugador = empiezaJugador,
-                            onEmpiezaJugadorChange = { empiezaJugador = it },
-                            dificultad = dificultad,
-                            onDificultadChange = { dificultad = it }
-                        )
-
+                        ControlesSeleccion(empiezaJugador, { empiezaJugador = it }, dificultad, { dificultad = it })
                         Spacer(Modifier.height(24.dp))
-
                         ControlesAccion(
                             onIniciarJuego = onIniciarJuegoNuevo,
                             onMostrarAlerta = { mostrar_alerta = true },
+                            onIniciarMultijugador = ::iniciarMultijugador,
                             fillWidthFactor = 0.7f,
                             juegoGuardado = juegoGuardado,
                             onContinuarJuego = onContinuarJuego
@@ -307,9 +348,7 @@ fun PantallaInicio(navController: NavHostController) {
                 }
             }
 
-            if (!esHorizontal) {
-                Spacer(Modifier.weight(1f))
-            }
+            if (!esHorizontal) Spacer(Modifier.weight(1f))
         }
 
         // Botón de Créditos
@@ -360,19 +399,26 @@ fun PantallaInicio(navController: NavHostController) {
                 text = {
                     Column {
                         Text("Desarrollado por Fredy Alexander Gonzalez Pobre")
-                        Text("Universidad Naciona Ing. De Sistemas Y Computacion", fontSize = 14.sp, color = Color.Gray)
+                        Text("Universidad Nacional - Ing. de Sistemas y Computación", fontSize = 14.sp, color = Color.Gray)
                     }
                 },
                 confirmButton = {
-                    TextButton(
-                        onClick = {
-                            mostrar_creditos = false
-                        }
-                    ) {
+                    TextButton(onClick = { mostrar_creditos = false }) {
                         Text("Volver", color = Color(0xFF1CB72B), fontWeight = FontWeight.Bold)
                     }
                 }
             )
+        }
+
+        if (creandoPartida) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
         }
     }
 }
