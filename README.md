@@ -21,8 +21,16 @@ En este proyecto, dentro de las diferentes ramas del repositorio, se encontrará
 - 🔄 **Reto 6 Orientación y Guardado de Estado**  
   En este reto se implementa el **cambio de orientación de la pantalla** (portrait ↔ landscape) y se desarrollan **mecanismos de guardado básico** para conservar el estado del juego cuando ocurre una rotación o interrupción, garantizando una experiencia de usuario fluida y sin pérdidas de información.  
 
+- ☁️ **Reto 7 Triqui en Línea con Firebase**  
+  En este reto se desarrolla la **versión en línea del juego de Triqui**, utilizando **Firebase** como backend para la sincronización de datos en tiempo real.  
+  Se implementan funcionalidades de:
+  - **Sincronización del tablero** entre dos jugadores remotos.  
+  - **Gestión de partidas en tiempo real** usando **Firebase Realtime Database** y **Firestore**.  
+  - Interfaz adaptada para el juego multijugador en línea.  
+
 ---
 
 ## 👨‍💻 **Autor**
 **Fredy González**  
 Estudiante de la Universidad Nacional de Colombia
+
