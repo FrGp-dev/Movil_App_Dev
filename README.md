@@ -26,7 +26,11 @@ En este proyecto, dentro de las diferentes ramas del repositorio, se encontrará
   Se implementan funcionalidades de:
   - **Sincronización del tablero** entre dos jugadores remotos.  
   - **Gestión de partidas en tiempo real** usando **Firebase Realtime Database** y **Firestore**.  
-  - Interfaz adaptada para el juego multijugador en línea.  
+  - Interfaz adaptada para el juego multijugador en línea.
+
+- 🏢 **Directorio de Empresas**  
+  En este proyecto se desarrolla una aplicación Android que funciona como un **directorio digital de empresas**, permitiendo **registrar, buscar y visualizar información** de distintas organizaciones.  
+  Se implementan componentes de interfaz adaptativos, manejo de **listas dinámicas** y persistencia local o remota de datos según el alcance del desarrollo.
 
 ---
 
