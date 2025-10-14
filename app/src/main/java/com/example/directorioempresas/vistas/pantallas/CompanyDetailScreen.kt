@@ -30,6 +30,10 @@ fun CompanyDetailScreen(
     var classification by remember { mutableStateOf("") }
     var isNewEntry by remember { mutableStateOf(companyId == 0) }
 
+    // Estados de validacion
+    var nameError by remember { mutableStateOf(false) }
+    var classificationError by remember { mutableStateOf(false) }
+
     // 2. Cargar datos si es una edición (companyId != 0)
     LaunchedEffect(companyId) {
         if (!isNewEntry) {
@@ -54,18 +58,30 @@ fun CompanyDetailScreen(
 
     // 3. Lógica de Guardar
     fun onSave() {
-        val companyToSave = Company(
-            id = if (isNewEntry) 0 else companyId,
-            name = name,
-            website = website,
-            phone = phone,
-            email = email,
-            productsAndServices = productsAndServices,
-            classification = classification
-        )
-        viewModel.saveCompany(companyToSave)
-        onBack()
+
+        val isNameValid = name.isNotBlank()
+        val isClassificationValid = classification.isNotBlank()
+
+        nameError = !isNameValid
+        classificationError = !isClassificationValid
+
+        if (isNameValid && isClassificationValid) {
+            val companyToSave = Company(
+                id = if (isNewEntry) 0 else companyId,
+                name = name.trim(), // Limpia espacios en blanco
+                website = website.trim(),
+                phone = phone.trim(),
+                email = email.trim(),
+                productsAndServices = productsAndServices.trim(),
+                classification = classification.trim() // Limpia espacios en blanco
+            )
+            viewModel.saveCompany(companyToSave)
+            onBack()
+        }
     }
+
+    // Estado de habilitación del botón de guardar
+    val canSave = name.isNotBlank() && classification.isNotBlank()
 
     Scaffold(
         topBar = {
