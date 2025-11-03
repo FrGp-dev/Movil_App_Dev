@@ -32,10 +32,11 @@ En este proyecto, dentro de las diferentes ramas del repositorio, se encontrará
   En este proyecto se desarrolla una aplicación Android que funciona como un **directorio digital de empresas**, permitiendo **registrar, buscar y visualizar información** de distintas organizaciones.  
   Se implementan componentes de interfaz adaptativos, manejo de **listas dinámicas** y persistencia local o remota de datos según el alcance del desarrollo.
 
- 
 - 🗺️ **Reto 9 – GPS y Puntos de Interés**
   Aplicación que utiliza el GPS del dispositivo para obtener la ubicación actual y mostrar lugares cercanos en un mapa interactivo con Open Street Maps.
 
+- 🌐 Reto 10 – Consumo Web (API SODA2)
+Aplicación que se conecta a la plataforma de datos abiertos del gobierno colombiano usando la API SODA2, realizando consultas en tiempo real al conjunto de datos de Diagnóstico de Apropiación de las TIC 2025 – Cartagena y mostrando los resultados dentro de la app.
 
 ---
 
