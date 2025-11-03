@@ -39,13 +39,20 @@ fun EntidadesApp(
     val camposVacios = searchDependencia.isBlank() && searchVinculacion.isBlank()
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("🔎 Consulta de Encuestas (SODA V2)") }) }
+        topBar = {
+            TopAppBar(
+                title = { Text("🔎 Consulta de Encuestas (SODA V2)") },
+                modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
+            )
+        },
+        contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp)
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp)
                 .fillMaxSize()
+
         ) {
             AutoCompleteField(
                 label = "Filtro por Dependencia",
@@ -112,6 +119,7 @@ fun EntidadesApp(
         }
     }
 
+
     selectedJson?.let { jsonContent ->
         Dialog(onDismissRequest = viewModel::clearSelectedJson) {
 
@@ -145,6 +153,7 @@ fun EntidadesApp(
 
                     Spacer(Modifier.height(16.dp))
 
+                    // Botón de Cierre
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
