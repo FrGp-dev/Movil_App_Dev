@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dadm.consumoweb.data.Entidad
 import com.dadm.consumoweb.vistas.EntidadesViewModel
@@ -26,18 +27,13 @@ import androidx.compose.runtime.collectAsState
 @Composable
 fun EntidadesApp(
     viewModel: EntidadesViewModel = viewModel()
-
 ) {
-
     val searchDependencia by viewModel.searchDependencia.collectAsState()
     val searchVinculacion by viewModel.searchVinculacion.collectAsState()
-
     val entidades by viewModel.entidades.collectAsState()
     val buscando by viewModel.buscando.collectAsState()
-
     val opcionesDependencia by viewModel.opcionesDependencia.collectAsState()
     val opcionesVinculacion by viewModel.opcionesVinculacion.collectAsState()
-
     val selectedJson by viewModel.selectedJsonData.collectAsState()
 
     val camposVacios = searchDependencia.isBlank() && searchVinculacion.isBlank()
@@ -48,10 +44,9 @@ fun EntidadesApp(
         Column(
             modifier = Modifier
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
                 .fillMaxSize()
         ) {
-            // ... (Campos de búsqueda y botón) ...
             AutoCompleteField(
                 label = "Filtro por Dependencia",
                 placeholder = "Seleccione o escriba la Dependencia",
@@ -93,13 +88,12 @@ fun EntidadesApp(
                 entidades.isNotEmpty() -> {
                     Text(
                         text = "Resultados encontrados: ${entidades.size}",
-                        style = MaterialTheme.typography.subtitle1
+                        style = MaterialTheme.typography.subtitle1,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
 
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(entidades) { entidad ->
-
                             EntidadItem(
                                 entidad = entidad,
                                 onClick = { viewModel.onEntidadClicked(entidad) }
@@ -119,30 +113,51 @@ fun EntidadesApp(
     }
 
     selectedJson?.let { jsonContent ->
-        AlertDialog(
-            onDismissRequest = viewModel::clearSelectedJson, // Cerrar al tocar fuera
-            title = { Text("JSON Completo del Registro") },
-            text = {
+        Dialog(onDismissRequest = viewModel::clearSelectedJson) {
 
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+            Card(
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 500.dp)
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    // Título
                     Text(
-                        text = jsonContent,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp
+                        text = "JSON Completo del Registro",
+                        style = MaterialTheme.typography.h6
                     )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = jsonContent,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 12.sp
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = viewModel::clearSelectedJson) {
+                            Text("Cerrar")
+                        }
+                    }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = viewModel::clearSelectedJson) {
-                    Text("Cerrar")
-                }
-            },
-            modifier = Modifier.padding(16.dp).fillMaxHeight(0.8f)
-        )
+            }
+        }
     }
-
 }
-
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
