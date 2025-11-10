@@ -35,9 +35,11 @@ En este proyecto, dentro de las diferentes ramas del repositorio, se encontrará
 - 🗺️ **Reto 9 – GPS y Puntos de Interés**
   Aplicación que utiliza el GPS del dispositivo para obtener la ubicación actual y mostrar lugares cercanos en un mapa interactivo con Open Street Maps.
 
-- 🌐 Reto 10 – Consumo Web (API SODA2)
-Aplicación que se conecta a la plataforma de datos abiertos del gobierno colombiano usando la API SODA2, realizando consultas en tiempo real al conjunto de datos de Diagnóstico de Apropiación de las TIC 2025 – Cartagena y mostrando los resultados dentro de la app.
+- 🌐 **Reto 10 – Consumo Web (API SODA2)**  
+ Aplicación que se conecta a la plataforma de datos abiertos del gobierno colombiano usando la API SODA2, realizando consultas en tiempo real al conjunto de datos de Diagnóstico de Apropiación de las TIC 2025 – Cartagena y mostrando los resultados dentro de la app.
 
+- 🤖 **Reto 11 – Chatbot con Gemini y Firebase**   
+Aplicación que integra los servicios de Gemini AI a través de Firebase, permitiendo crear un chatbot conversacional capaz de generar respuestas inteligentes y contextualizadas dentro de una interfaz Android nativa.
 ---
 
 ## 👨‍💻 **Autor**
